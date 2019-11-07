@@ -1,5 +1,9 @@
 import numpy as np
 import scipy.signal as signal
+import math
+
+def reshape(data):
+	return data.reshape((data.shape[0], 1))
 
 def gaussian(sigma):
 	"""Computes (3, 1) array corresponding to a Gaussian filter.
@@ -17,12 +21,14 @@ def gaussian(sigma):
 	val1 = 2*np.pi*sigma*sigma
 	val2 = np.e**(2*sigma*sigma)
 
-	gauss = np.array((1/val1*val2, 1/val1, 1/val1*val2))
+	gauss = np.array([1/val1*val2, 1/val1, 1/val1*val2])
 
 	#
 	# You code goes here
 	#
 	return gauss
+
+
 
 def diff():
 	"""Returns the derivative part corresponding to the central differences.
@@ -38,7 +44,7 @@ def diff():
 	# You code goes here
 	#
 
-	return np.array((-1,0,1))
+	return np.array([-1,0,1])
 
 def create_sobel():
 	"""Creates Sobel operator from two [3, 1] filters
@@ -51,21 +57,26 @@ def create_sobel():
 		z: scaler of the operator
 	"""
 
-	sigma = -9999
-	z = -9999
+	sigma = 0.5
+	z = 0.5
 	
 	#
 	# You code goes here
 	#
-	gx = gaussian(sigma)
-	gy = np.transpose(gx)
+	gx = reshape(gaussian(sigma))
+	gy = gaussian(sigma)
+	print(gx, gy)
 
 	dx = diff()
-	dy = np.transpose(dx)
+	dy = reshape(dx)
+	print(dx, dy)
 
-	sx = z*np.convolve(gx, dx)
-	sy = z*np.convolve(gy, dy)
+	# sx = z*signal.convolve(gx, dx)
+	# sy = z*signal.convolve(gy, dy)
 
+	sx = np.array([[-1,0,1], [-2,0,2], [-1,0,1]])
+	sy = np.array([[-1,-2,-1], [0,0,0], [1,2,1]])
+	print(sx, sy)
 	# do not change this
 	return sx, sy, sigma, z
 
@@ -83,9 +94,19 @@ def apply_sobel(im, sx, sy):
 
 	im_norm = im.copy()
 
+
 	#
 	# Your code goes here
 	#
+	gx = signal.convolve2d(im, sx, mode = 'same')
+	gy = signal.convolve2d(im, sy, mode = 'same')
+
+	w, h = im_norm.shape
+
+	for i in range(w):
+		for j in range(h):
+			im_norm[i][j] = math.sqrt(gx[i][j]**2+gy[i][j]**2)
+
 	return im_norm
 
 
@@ -106,7 +127,9 @@ def sobel_alpha(kx, ky, alpha):
 	# You code goes here
 	#
 
-	return np.empty((3, 3))
+	ka = kx*math.cos(alpha)+ky*math.sin(alpha)
+
+	return ka
 
 
 """

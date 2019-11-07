@@ -23,15 +23,17 @@ def rgb2bayer(image):
     # You code goes here
     #
 
+    #removing corresponding colors from each pixels. 
+
     for i in range(len(bayer)):
         for j in range(len(bayer[0])):
-            if i%2 and j%2:
+            if i%2 and j%2: #blue
                 temp = bayer[i][j]
                 bayer[i][j] = [0,0,temp[2]]
-            elif i%2 or j%2:
+            elif i%2 or j%2: #green
                 temp = bayer[i][j]
                 bayer[i][j] = [0,temp[1],0]
-            else:
+            else: #red
                 temp = bayer[i][j]
                 bayer[i][j] = [temp[0],0,0]
 
@@ -53,8 +55,11 @@ def nearest_up_x2(x):
     #
     # You code goes here
     #
+
+    #create an empty image
     y = np.empty((2*h, 2*w))
 
+    #fill in the pixels with corresponding colors of the original image
     for i in range(h):
         for j in range(w):
             temp = x[i][j]
@@ -86,19 +91,29 @@ def bayer2rgb(bayer):
     # You code goes here
     #
     image = bayer.copy()
-    rb_k = np.array([[1/16, 1/16, 1/16], [1/16, 1/2, 1/16], [1/16, 1/16, 1/16]])
-    g_k = np.array([[0,0,0], [0,1/2,1/2], [0,0,0]])
+    # result = bayer.copy()
+    # h,w = image[:,:,0].shape
+
+    #idk part. 
+    rb_k = np.array([[1/2, 1/2, 1/2], [1/2, 1, 1/2], [1/2, 1/2, 1/2]])
+    g_k = np.array([[1/4,1/4,1/4], [1/4,1,1/4], [1/4,1/4,1/4]])
 
 
     image[:,:,0] = signal.convolve2d(image[:,:,0], rb_k, mode='same')
     image[:,:,2] = signal.convolve2d(image[:,:,2], rb_k, mode='same')
     image[:,:,1] = signal.convolve2d(image[:,:,1], g_k, mode='same')
 
-    # x,y,z = image.shape
-    # for i in range(x):
-    #     for j in range(y):
-    #         temp = image[i][j]
-    #         image[i][j] = [temp[0]/2, temp[1]/2, temp[2]/2]
+    #orgval not zero, orgval smaller
+    # for i in range(h):
+    #     for j in range(w):
+    #         img = image[i][j]
+    #         res = result[i][j]
+    #         if i%2 and j%2: #blue
+    #             result[i][j] = [img[0], img[1], res[2]]
+    #         elif i%2 or j%2: #green
+    #             result[i][j] = [img[0], res[1], img[2]]
+    #         else: #red
+    #             result[i][j] = [res[0], img[1], img[2]]
 
     assert image.ndim == 3 and image.shape[-1] == 3 and \
                 g_k.shape == (3, 3) and rb_k.shape == (3, 3)
@@ -119,6 +134,8 @@ def scale_and_crop_x2(bayer):
     #
     # You code goes here
     #
+
+    #double up the image and than crop 
     h,w = bayer.shape
     cropped = nearest_up_x2(bayer.copy())
     cropped = cropped[h//2:h//2+h, w//2:w//2+w]

@@ -11,6 +11,7 @@ def load_points(path):
         world: A N*3 array of 3D points form world coordinate
     '''
 
+    #idk part how to load the points from npz file
     image_pts = np.empty((100, 3))
     world_pts = np.empty((100, 4))
 
@@ -115,7 +116,7 @@ def solve_c(P):
     idx = np.argmin(s)
 
     assert s[idx]==0
-    
+
     c = np.transpose(v)[idx]
 
     return c
