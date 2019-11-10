@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.signal as signal
 import math
+from scipy.integrate import quad
 
 def reshape(data):
 	return data.reshape((data.shape[0], 1))
@@ -15,17 +16,21 @@ def gaussian(sigma):
 	Returns:
 		gauss: numpy (3, 1) array of type float
 
-	"""
-
-	gauss = np.empty((3, 1))
-	val1 = 2*np.pi*sigma*sigma
-	val2 = np.e**(2*sigma*sigma)
-
-	gauss = np.array([1/val1*val2, 1/val1, 1/val1*val2])
+	"""	
 
 	#
 	# You code goes here
 	#
+	
+	#Let Gaussian function as f. Since our target pixel is located at position zero, 
+	#calculate central value of gauss array by integral of f from -1/2 to 1/2. 
+	f = lambda x:(np.exp(-(x**2)/(2*(sigma**2))))/(2*math.pi*(sigma**2))
+	t = quad(f, -0.5, 0.5)[0]
+
+	#other values are chosed as (1-t)/2 since its symmetric and sum up to 1. 
+
+	gauss = np.array([(1-t)/2, t, (1-t)/2])
+
 	return gauss
 
 
@@ -57,26 +62,23 @@ def create_sobel():
 		z: scaler of the operator
 	"""
 
-	sigma = 0.5
-	z = 0.5
+	#chosed these value of sigma and z because it returned most similar value compared to sobel filter given in docu. 
+	sigma = 0.525509
+	z = 4
 	
 	#
 	# You code goes here
 	#
+
+	#reshape corresponding gx and dy to calculate its convolution efficiently. 
 	gx = reshape(gaussian(sigma))
 	gy = gaussian(sigma)
-	print(gx, gy)
 
 	dx = diff()
 	dy = reshape(dx)
-	print(dx, dy)
+	sx = z*gx*dx
+	sy = z*dy*gy
 
-	# sx = z*signal.convolve(gx, dx)
-	# sy = z*signal.convolve(gy, dy)
-
-	sx = np.array([[-1,0,1], [-2,0,2], [-1,0,1]])
-	sy = np.array([[-1,-2,-1], [0,0,0], [1,2,1]])
-	print(sx, sy)
 	# do not change this
 	return sx, sy, sigma, z
 
@@ -98,9 +100,12 @@ def apply_sobel(im, sx, sy):
 	#
 	# Your code goes here
 	#
+
+	#Calculate the convolution of an image in both x and y direction.
 	gx = signal.convolve2d(im, sx, mode = 'same')
 	gy = signal.convolve2d(im, sy, mode = 'same')
 
+	#Calculate the total normalized value and return it as im_norm
 	w, h = im_norm.shape
 
 	for i in range(w):
@@ -127,6 +132,10 @@ def sobel_alpha(kx, ky, alpha):
 	# You code goes here
 	#
 
+	#Change angle from radian to dgree
+	alpha = 180*(alpha/math.pi)
+
+	#Evaluate the value(3*3 matrix) of ka
 	ka = kx*math.cos(alpha)+ky*math.sin(alpha)
 
 	return ka
@@ -167,4 +176,4 @@ class EdgeDetection(object):
 		Any wrong answer will cancel the correct answer.
 		"""
 
-		return ((-1, -1), )
+		return ((2,4), (2, 1), (1,3))

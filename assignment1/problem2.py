@@ -23,11 +23,13 @@ def rgb2bayer(image):
     # You code goes here
     #
 
-    #removing corresponding colors from each pixels. 
+    #removing corresponding color components from each pixels. 
+    #ex) for blue pixels, remove red and green color values.
+    #After this process, bayer[:,:,0] can be the result of red filter.. and same for other colors. 
 
     for i in range(len(bayer)):
         for j in range(len(bayer[0])):
-            if i%2 and j%2: #blue
+            if i%2 and j%2: #blue pixel
                 temp = bayer[i][j]
                 bayer[i][j] = [0,0,temp[2]]
             elif i%2 or j%2: #green
@@ -60,6 +62,7 @@ def nearest_up_x2(x):
     y = np.empty((2*h, 2*w))
 
     #fill in the pixels with corresponding colors of the original image
+    #for nearest neighbor method, used upper left pixel's color to fill in the 4 pixels in scaled up image. 
     for i in range(h):
         for j in range(w):
             temp = x[i][j]
@@ -90,30 +93,39 @@ def bayer2rgb(bayer):
     #
     # You code goes here
     #
+
     image = bayer.copy()
-    # result = bayer.copy()
-    # h,w = image[:,:,0].shape
+    h,w = image[:,:,0].shape
 
-    #idk part. 
-    rb_k = np.array([[1/2, 1/2, 1/2], [1/2, 1, 1/2], [1/2, 1/2, 1/2]])
-    g_k = np.array([[1/4,1/4,1/4], [1/4,1,1/4], [1/4,1/4,1/4]])
+    #For red and blue, nearest neighbor method is used. 
+    #Because only one pixel of red or blue is sharing edge with green pixel, 
+    #array is filled with 1 in its second column and row. 
 
+    #For green, bilinear interpolation is used. 
+    #To calculate amont 4 green pixels near each red and green pixels, 
+    #different weights(1/4, 1/8) is used for different distance. 
+    rb_k = np.array([[0,1,0], [1,1,1], [0,1,0]])
+    g_k = np.array([[1/8,1/4,1/8], [1/4,1,1/4], [1/8,1/4,1/8]])
 
+    #Step1: Calculating a convolution
+    #Calculate a convolution for each color using above kernels. 
     image[:,:,0] = signal.convolve2d(image[:,:,0], rb_k, mode='same')
     image[:,:,2] = signal.convolve2d(image[:,:,2], rb_k, mode='same')
     image[:,:,1] = signal.convolve2d(image[:,:,1], g_k, mode='same')
 
-    #orgval not zero, orgval smaller
-    # for i in range(h):
-    #     for j in range(w):
-    #         img = image[i][j]
-    #         res = result[i][j]
-    #         if i%2 and j%2: #blue
-    #             result[i][j] = [img[0], img[1], res[2]]
-    #         elif i%2 or j%2: #green
-    #             result[i][j] = [img[0], res[1], img[2]]
-    #         else: #red
-    #             result[i][j] = [res[0], img[1], img[2]]
+    #Step2: Reorganizing the values
+    #Because pixels that already has its own color value prior to step 1
+    #doesn't have to change its color. 
+    #Therefore, this step is for bringing back original values. 
+    
+    for i in range(h):
+        for j in range(w):
+            bay = bayer[i][j]
+            for idx in range(3):
+                if bay[idx]!=0:
+                    image[i][j][idx] = bay[idx]
+
+
 
     assert image.ndim == 3 and image.shape[-1] == 3 and \
                 g_k.shape == (3, 3) and rb_k.shape == (3, 3)
@@ -135,7 +147,7 @@ def scale_and_crop_x2(bayer):
     # You code goes here
     #
 
-    #double up the image and than crop 
+    #double up the image and than crop with respect to center point. 
     h,w = bayer.shape
     cropped = nearest_up_x2(bayer.copy())
     cropped = cropped[h//2:h//2+h, w//2:w//2+w]
