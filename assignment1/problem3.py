@@ -135,4 +135,4 @@ def solve_c(P):
     c = np.transpose(v)[idx]
     c = c*(1/c[3])
 
-    return c[0:2]
+    return c[0:3]
