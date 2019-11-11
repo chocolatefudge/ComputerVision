@@ -106,6 +106,6 @@ def problem4():
 
 if __name__ == "__main__":
 	#problem1()
-	problem2()
+	#problem2()
 	#problem3()
-	#problem4()
+	problem4()

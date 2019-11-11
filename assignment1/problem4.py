@@ -23,13 +23,11 @@ def gaussian(sigma):
 	#
 	
 	#Let Gaussian function as f. Since our target pixel is located at position zero, 
-	#calculate central value of gauss array by integral of f from -1/2 to 1/2. 
+	#calculate central value of gauss array by setting x to 0. 
+	#other values are evaluated by x=-1 and x=1.
 	f = lambda x:(np.exp(-(x**2)/(2*(sigma**2))))/(2*math.pi*(sigma**2))
-	t = quad(f, -0.5, 0.5)[0]
-
-	#other values are chosed as (1-t)/2 since its symmetric and sum up to 1. 
-
-	gauss = np.array([(1-t)/2, t, (1-t)/2])
+	
+	gauss = np.array([f(-1), f(0), f(1)])
 
 	return gauss
 
@@ -63,8 +61,8 @@ def create_sobel():
 	"""
 
 	#chosed these value of sigma and z because it returned most similar value compared to sobel filter given in docu. 
-	sigma = 0.525509
-	z = 4
+	sigma = 0.85
+	z = 9
 	
 	#
 	# You code goes here
@@ -176,4 +174,4 @@ class EdgeDetection(object):
 		Any wrong answer will cancel the correct answer.
 		"""
 
-		return ((2,4), (2, 1), (1,3))
+		return ((2, 1), (1,3))
