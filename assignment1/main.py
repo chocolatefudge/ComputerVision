@@ -42,13 +42,13 @@ def problem2():
 	im = load_image("data/castle.png")
 
 	bayer = rgb2bayer(im)
-	display_image(bayer)
+	#display_image(bayer)
 	
 	# scale and crop each channel
 	bayer[:, :, 0] = scale_and_crop_x2(bayer[:, :, 0])
 	bayer[:, :, 1] = scale_and_crop_x2(bayer[:, :, 1])
 	bayer[:, :, 2] = scale_and_crop_x2(bayer[:, :, 2])
-	display_image(bayer)
+	#display_image(bayer)
 
 	# interpolate
 	im_zoom, _, _ = bayer2rgb(bayer)
@@ -106,6 +106,6 @@ def problem4():
 
 if __name__ == "__main__":
 	#problem1()
-	#problem2()
+	problem2()
 	#problem3()
-	problem4()
+	#problem4()
