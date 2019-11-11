@@ -79,7 +79,15 @@ def homogeneous_Ax(A):
     idx = np.argmin(s)
 
     P = np.transpose(v)[idx]
-    return np.array(P[0:4], P[4:8], P[8:12])
+    #print(P)
+    mat_p = np.empty((3,4))
+    #print(P[0:4])
+    mat_p[0] = P[0:4]
+    mat_p[1] = P[4:8]
+    mat_p[2] = P[8:12]
+    print(mat_p)
+
+    return mat_p
 
 
 def solve_KR(P):
@@ -100,6 +108,7 @@ def solve_KR(P):
     """
 
     M = np.hsplit(P, np.array([3,6]))[0]
+    print(M)
     R, K = np.linalg.qr(M)
 
     val = K[2][2]
@@ -120,9 +129,10 @@ def solve_c(P):
     """
     u,s,v = np.linalg.svd(P)
     idx = np.argmin(s)
-
-    assert s[idx]==0
+    #print(s[idx])
+    #assert s[idx]==0
 
     c = np.transpose(v)[idx]
+    c = c*(1/c[3])
 
-    return c
+    return c[0:2]
