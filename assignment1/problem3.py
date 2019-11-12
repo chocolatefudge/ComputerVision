@@ -16,8 +16,8 @@ def load_points(path):
     data = np.load('data/points.npz') # loading data
     lst = data.files # It includes the key image and world
 
-    image_pts = data[lst[0]]#np.empty((100, 3))
-    world_pts = data[lst[1]]#np.empty((100, 4))
+    image_pts = data[lst[0]]
+    world_pts = data[lst[1]]
 
     # sanity checks
     assert image_pts.shape[0] == world_pts.shape[0]
@@ -40,26 +40,27 @@ def create_A(x, X):
     """
 
     N, _ = x.shape
-    assert N == X.shape[0] #N is 75
-    print(N)
+    assert N == X.shape[0]
 
-    A = np.empty((150, 12))
+    # Making 2*N X 12 matrix
+    A = np.empty((2*N, 12))
+
+    # Putting the values for each 2 rows
+    # So there would be 2*N rows
 
     for i in range(N):
         x1 = x[i][0]
         y1 = x[i][1]
         temp = X[i]
 
-        #print(A[0:4])
-
+        # Values for the 2*i row
         A[2*i,0:4] = 0
         A[2*i,4:8] = -np.transpose(temp)
         A[2*i,8:12] = y1*np.transpose(temp)
-
+        # Values for the 2*i+1 row
         A[2*i+1,0:4] = np.transpose(temp)
         A[2*i+1,4:8] = 0
         A[2*i+1,8:12] = -x1*np.transpose(temp)
-
 
     assert A.shape[0] == 2*N and A.shape[1] == 12
     return A
@@ -75,17 +76,19 @@ def homogeneous_Ax(A):
     Returns:
         P: (3, 4) projection matrix P
     """
+
+    # Using SVD decomposition with np.linalg.svd function
+    # Getting the right most singular vector
     u,s,v = np.linalg.svd(A)
     idx = np.argmin(s)
+    P = v[idx]
 
-    P = np.transpose(v)[idx]
-    #print(P)
+    # Making it to 3*4 matrix
     mat_p = np.empty((3,4))
-    #print(P[0:4])
     mat_p[0] = P[0:4]
     mat_p[1] = P[4:8]
     mat_p[2] = P[8:12]
-    print(mat_p)
+    #print(mat_p)
 
     return mat_p
 
@@ -106,11 +109,14 @@ def solve_KR(P):
         K: 3x3 matrix with intrinsics
         R: 3x3 rotation matrix
     """
-
+    # Splitting the array to 3*3 and 3*1 matrix, and get the 3*3 matrix
     M = np.hsplit(P, np.array([3,6]))[0]
-    print(M)
+    #print(M)
+
+    # Using np.linalg.qr function, get the R and K
     R, K = np.linalg.qr(M)
 
+    # Making K has 1 in the bottom right corner and make R corresponds to K multiplying the value
     val = K[2][2]
     R = val*R
     K = K/val
@@ -127,12 +133,11 @@ def solve_c(P):
     Returns:
         c: 3x1 camera center coordinate in the world frame
     """
+    # Doing SVD decomposition
     u,s,v = np.linalg.svd(P)
-    idx = np.argmin(s)
-    #print(s[idx])
-    #assert s[idx]==0
-
-    c = np.transpose(v)[idx]
+    # Getting the right most singular vector
+    c = v[3]
+    # make the c[3] has the 1 as a homogeneous form of the vector
     c = c*(1/c[3])
-
+    # Getting the left 3 elements
     return c[0:3]
