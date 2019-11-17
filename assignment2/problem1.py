@@ -6,22 +6,64 @@ from scipy.signal import convolve2d
 def load_data(path):
     '''
     Load data from folder data, face images are in the folder facial_images, face features are in the folder facial_features.
-    
+
 
     Args:
         path: path of folder data
 
     Returns:
-        imgs: list of face images as numpy arrays 
-        feats: list of facial features as numpy arrays 
+        imgs: list of face images as numpy arrays
+        feats: list of facial features as numpy arrays
     '''
-
+    # List for imgs and feats numpy arrays
     imgs = []
     feats = []
 
-    #
-    # TODO
-    #
+    # List for names of files
+    img_files = []
+    feat_files = []
+
+    # paths
+    img_path = path + '/facial_images'
+    feats_path = path + '/facial_features'
+
+    # For img files, make the list of file names in the directory facial_images
+    # Using os.walk and os.path methods
+    for root, dirs, files in os.walk(img_path, topdown=True):
+        for name in files:
+            img_files.append(os.path.join(root, name))
+
+    # For img files, let's make python arrays
+    for file in img_files:
+        with open(file, 'rb') as infile:
+
+            # Let's get width and height from header
+            header = infile.readline()
+            width, height, maxval = [int(item) for item in header.split()[1:]]
+
+            # Make it into np array with data type uint8 cause the maxval is 255
+            imgs.append(np.fromfile(infile, dtype=np.uint8).reshape((height, width)))
+
+
+    # For feat files, make the list of file names in the directory facial_features
+    # Using os.walk and os.path methods
+    for root, dirs, files in os.walk(feats_path, topdown=True):
+        for name in files:
+            feat_files.append(os.path.join(root, name))
+
+    # For feat files, let's make python arrays
+    for file in feat_files:
+        with open(file, 'rb') as infile:
+
+            # Let's get width and height from header
+            # The info of width and height is in second line
+            header = infile.readline()
+            header = infile.readline()
+            width, height = [int(item) for item in header.split()]
+            header = infile.readline()
+
+            # Make it into np array with data type uint8 cause the maxval is 255
+            feats.append(np.fromfile(infile, dtype=np.uint8).reshape((height, width)))
 
     return imgs, feats
 
@@ -37,11 +79,20 @@ def gaussian_kernel(fsize, sigma):
         The Gaussian kernel
     '''
 
-    #
-    # TODO
-    #
+    # To make the y, x column and rows...
+    m = (fsize-1.)/2.
 
-    return np.empty(fsize, fsize)
+    # Make y, x column and row which has values like -m -m+1 ... m
+    # For example, '-2 -1 0 1 2' for size 5
+    y,x = np.ogrid[-m:m+1,-m:m+1]
+
+    # Using gaussian
+    kernel = np.exp(-(x*x + y*y) / (2.*sigma*sigma))
+    # Normalize the values so that the sum of all values be 1
+    if kernel.sum() != 0:
+        kernel /= kernel.sum()
+
+    return kernel
 
 def downsample_x2(x, factor=2):
     '''
@@ -54,11 +105,18 @@ def downsample_x2(x, factor=2):
         downsampled image as numpy array (H/2 * W/2)
     '''
 
-    #
-    # TODO
-    #
+    # Getting the height and width from x
+    H, W = x.shape
+    # Making the empty array sized H/2 * W/2
+    downsample = np.empty((H//2, W//2))
 
-    downsample = np.empty(None, None)
+    # Just put average of 4 values from 4 places to 1 place
+    # It makes things downsampled by factor of 2
+    for i in range(H//2):
+        for j in range(W//2):
+            # Using numpy mean function
+            arr = [x[i*2,j*2],x[i*2+1,j*2],x[i*2,j*2+1],x[i*2+1, j*2+1]]
+            downsample[i, j] = np.mean(arr)
 
     return downsample
 
@@ -79,9 +137,15 @@ def gaussian_pyramid(img, nlevels, fsize, sigma):
     '''
     GP = []
 
-    #
-    # TODO
-    #
+    GP.append(img)
+
+    # For nlevls-1 times
+    for i in range(nlevels-1):
+        # First, filter with the gaussian kernel
+        img = convolve2d(img, gaussian_kernel(fsize, sigma), mode = 'same', boundary = 'symm')
+        # And do the downsampling
+        img = downsample_x2(img)
+        GP.append(img)
 
     return GP
 
@@ -89,8 +153,8 @@ def template_distance(v1, v2):
     '''
     Calculates the distance between the two vectors to find a match.
     Browse the course slides for distance measurement methods to implement this function.
-    Tips: 
-        - Before doing this, let's take a look at the multiple choice questions that follow. 
+    Tips:
+        - Before doing this, let's take a look at the multiple choice questions that follow.
         - You may need to implement these distance measurement methods to compare which is better.
 
     Args:
@@ -100,19 +164,17 @@ def template_distance(v1, v2):
     Returns:
         Distance
     '''
-    distance = None
-
-    #
-    # TODO
-    #
-
+    # SSD, Just subtract two vectors and squares it.
+    # print(v1.shape, v2.shape)
+    distance = np.sum((v1-v2)**2)
+    #distance = np.sum(np.dot(np.transpose(v1), v2))
     return distance
 
 
 def sliding_window(img, feat, step=1):
-    ''' 
+    '''
     A sliding window for matching features to windows with SSDs. When a match is found it returns to its location.
-    
+
     Args:
         img: face image as numpy array (H * W)
         feat: facial feature as numpy array (H * W)
@@ -123,9 +185,22 @@ def sliding_window(img, feat, step=1):
 
     min_score = None
 
-    #
-    # TODO
-    #
+    # Getting size of img
+    img_h, img_w  = img.shape
+    feat_h, feat_w  = feat.shape
+
+    for i in range(img_h):
+        # Checking the out of range problem
+        if i+feat_h >img_h:
+            continue
+        for j in range(img_w):
+            # Checking the out of range problem
+            if j+feat_w >img_w:
+                continue
+            val = template_distance(img[i:i+feat_h, j:j+feat_w], feat)
+
+            if min_score == None or val<min_score:
+                min_score = val
 
     return min_score
 
@@ -156,16 +231,16 @@ class Distance(object):
             'I will use Dot Product because it is more computationally efficient.'
         '''
 
-        return (None, None)  # TODO
+        return (2, 2)  # TODO
 
 
 def find_matching_with_scale(imgs, feats):
-    ''' 
-    Find face images and facial features that match the scales 
-    
+    '''
+    Find face images and facial features that match the scales
+
     Args:
         imgs: list of face images as numpy arrays
-        feats: list of facial features as numpy arrays 
+        feats: list of facial features as numpy arrays
     Returns:
         match: all the found face images and facial features that match the scales: N * (score, g_im, feat)
         score: minimum score between face image and facial feature
@@ -173,10 +248,31 @@ def find_matching_with_scale(imgs, feats):
         feat: facial feature
     '''
     match = []
-    (score, g_im, feat) = (None, None, None)
 
-    #
-    # TODO
-    #
+    for img in imgs:
+        # Initialize the values for the new img
+        (score, g_im, feat) = (None, None, None)
+
+        # For each pyramids and feature
+        for pyramid in gaussian_pyramid(img, 3, 5, 1.4):
+
+            # print('new_img', pyramid.shape)
+            for feat_ in feats:
+                # print("feat", feat_.shape)
+                # Check the minimum score of this pyramid to feat
+                val = sliding_window(pyramid,feat_)
+                if val != None:
+                # If it is minimum score for all pyramids for now,
+                # Set the values to this condition
+                    if score == None or val < score:
+                        score = val
+                        g_im = pyramid
+                        feat = feat_
+
+
+        # The last value is the condition for the minimum score
+        if score != None:
+            match.append((score, g_im, feat))
+            # print(g_im.shape)
 
     return match
