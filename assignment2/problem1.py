@@ -111,6 +111,7 @@ def downsample_x2(x, factor=2):
     downsample = np.empty((H//2, W//2))
 
     # Just put average of 4 values from 4 places to 1 place
+    # Using np.mean method
     # It makes things downsampled by factor of 2
     for i in range(H//2):
         for j in range(W//2):
@@ -137,6 +138,7 @@ def gaussian_pyramid(img, nlevels, fsize, sigma):
     '''
     GP = []
 
+    # Appending first original img
     GP.append(img)
 
     # For nlevls-1 times
@@ -165,8 +167,8 @@ def template_distance(v1, v2):
         Distance
     '''
     # SSD, Just subtract two vectors and squares it.
-    # print(v1.shape, v2.shape)
     distance = np.sum((v1-v2)**2)
+    # Dot product, using np.sum and np.dot
     #distance = np.sum(np.dot(np.transpose(v1), v2))
     return distance
 
@@ -189,6 +191,7 @@ def sliding_window(img, feat, step=1):
     img_h, img_w  = img.shape
     feat_h, feat_w  = feat.shape
 
+    # Go around by pixels and check the distance
     for i in range(img_h):
         # Checking the out of range problem
         if i+feat_h >img_h:
@@ -197,8 +200,9 @@ def sliding_window(img, feat, step=1):
             # Checking the out of range problem
             if j+feat_w >img_w:
                 continue
+            # Crop the img to feature's size and calculate distance
             val = template_distance(img[i:i+feat_h, j:j+feat_w], feat)
-
+            # Set the value if it's smallest for now
             if min_score == None or val<min_score:
                 min_score = val
 
@@ -230,7 +234,10 @@ class Distance(object):
             (1, 1) means
             'I will use Dot Product because it is more computationally efficient.'
         '''
-
+        '''
+        Since dot product just multiply every values, it may make things more sensitive to brightness.
+        Also, the results seems better when it comes to ssd method.
+        '''
         return (2, 2)  # TODO
 
 
