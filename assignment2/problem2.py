@@ -26,7 +26,30 @@ def load_faces(path, ext=".pgm"):
     # You code here
     #
     
-    return np.random.random((16, 256)), (16, 16)
+    #Empty list for image file names. 
+    img_files = []
+
+    #Empty list for image files
+    imgs = []
+
+    #List all the files in target path using os.walk(path)
+    #Save file names to img_files. 
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            img_files.append(os.path.join(root, name))
+
+    #Open each file in img_files and read header first to get h, w, max value info. 
+    #Then, read image file's content and save it to imgs array. 
+    for file in img_files:
+        with open(file, 'rb') as infile:
+            header = infile.readline()
+            width, height, maxval = [int(item) for item in header.split()[1:]]
+            #reshaping needed to organize whole pixels from one image in one row
+            imgs.append(np.fromfile(infile, dtype=np.uint8).reshape((height*width)))
+            
+    #Change list to numpy array and return
+    result = np.asarray(imgs)
+    return result, (height, width)
 
 #
 # Task 2
@@ -66,7 +89,7 @@ class PCA(object):
                 - we need singular values which we can obtain from the eigenvalues"
         """
 
-        return (0, 0)
+        return (1, 1, 2)
 
 #
 # Task 3
@@ -83,7 +106,30 @@ def compute_pca(X):
         lmb: (N, ) corresponding variance
     """
     
-    return np.random.random((100, 10)), np.random.random(10)
+    #Each rows are image vectors. 
+    #N: Number of images, M:Dimension
+    N, M = X.shape
+    
+    #Transpose X to arrange image vectors in column space. 
+    X_tr = np.transpose(X)
+    #now each columns are faces(imges)
+
+    #Calculate mean from X_tr(along the column axis)
+    x_mean = np.mean(X_tr, axis = 1)
+
+    #Subract mean from each corresponding elements of X_tr
+    for i in range(M):
+        for j in range(N):
+            X_tr[i][j]-=x_mean[i]
+
+    #SVD for X_tr - X_mean. 
+    u, s, vt = np.linalg.svd(X_tr)
+
+    #For getting variances, lambda = s^2/N is used for each eigenvalue in s. 
+    for i in range(s.shape[0]):
+        s[i] = s[i]*s[i]/N
+
+    return u, s
 
 #
 # Task 4
@@ -106,8 +152,24 @@ def basis(u, s, p = 0.5):
         containing at most p (percentile) of the variance.
     
     """
-    
-    return u
+
+
+    #calculate sum of the total singular values
+    #get a percentile
+    sum_total = np.sum(s)*p
+
+    #sum until total value reaches the percentile
+    sum_temp = 0
+    idx = 0
+
+    while sum_temp<sum_total:
+        sum_temp+=s[idx]
+        idx+=1
+
+    #return the part of the array(there are only D principal components)
+    result = u[:,:idx]
+
+    return result
 
 #
 # Task 5
@@ -126,7 +188,11 @@ def project(face_image, u):
         principal components
     """
     
-    return np.random.random((256, ))
+    #Projection of a vector to matrix. 
+
+    result = u@np.linalg.inv(np.transpose(u)@u)@np.transpose(u)@face_image
+
+    return result
 
 #
 # Task 6
@@ -153,7 +219,7 @@ class NumberOfComponents(object):
         For example: (1, 3)
         """
 
-        return 0
+        return 0 #Todo
 
 
 #
@@ -172,8 +238,42 @@ def search(Y, x, u, top_n):
     Returns:
         Y: (top_n, M)
     """
-    
-    return np.random.random((top_n, 256))
+    #Edge Case: return x itself. 
+    N, M = Y.shape
+    if top_n == 1:
+        return x
+
+    #Transpose both matrix to fit in shape
+    new_u = np.transpose(u)
+    new_Y = np.transpose(Y)
+
+    #Evaluate projection coefficients a's by multiplying two matrix. 
+    proj_matrix = new_u@new_Y
+    proj_vector = new_u@x.reshape((x.shape[0], 1))
+
+    #Calculate distance between each vector in proj_matrix with proj_vector and save to distance list. 
+    D, N = proj_matrix.shape
+    distance = []
+    for i in range(N):
+        dist = np.linalg.norm(proj_vector-proj_matrix[:,i])
+        distance.append(dist)
+
+    #Sort distance values and filter top_n values. 
+    dis_sort = distance.copy()
+    top_idx = np.argsort(dis_sort)[-top_n:]
+
+    # print(top_values)
+    # #Find top value's index and save to top_idx
+    # top_idx = []
+    # for j in top_values:
+    #     top_idx.append(distance.index(j))
+
+    #Get corresponding original image vector from Y. (Each row is vector)
+    result = np.empty([top_n, M])
+    for k in range(len(top_idx)):
+        result[k] = Y[top_idx[k]]
+
+    return result
 
 #
 # Task 8
@@ -195,4 +295,14 @@ def interpolate(x1, x2, u, N):
         image; Y[0] == project(x1, u); Y[-1] == project(x2, u)
     """
     
-    return np.random.random((3, 256))
+    #Project x1 and x2 to u. 
+    x1_proj = project(x1, u)
+    x2_proj = project(x2, u)
+
+    #For each componant in x1_proj and x2_proj, get linspace and append it to result. 
+    M = x1_proj.shape[0]
+    result = np.empty([N, M])
+    for i in range(M):
+        result[:,i] = np.linspace(x1_proj[i], x2_proj[i], num=N)
+
+    return result
