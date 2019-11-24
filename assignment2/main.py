@@ -68,10 +68,12 @@ def problem2():
     # Using 2 random images for testing
     test_face2 = y[0, :]
     test_face = y[-1, :]
+    # print(np.stack([test_face, test_face2]))
     show_images(np.stack([test_face, test_face2], 0), hw, (3, 1))
-
-    # Task 3. compute PCA
+    #
+    # # Task 3. compute PCA
     u, lmb = p2.compute_pca(y)
+
 
     # Tasks 4 and 5
     # percentiles of components
