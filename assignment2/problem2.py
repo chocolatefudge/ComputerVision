@@ -89,7 +89,7 @@ class PCA(object):
                 - we need singular values which we can obtain from the eigenvalues"
         """
 
-        return (1, 1, 2, 4)
+        return (1, 2, 4)
 
 #
 # Task 3
@@ -189,8 +189,6 @@ def project(face_image, u):
     """
 
     #Projection of a vector to matrix.
-
-    # result = u@np.linalg.inv(np.transpose(u)@u)@np.transpose(u)@face_image
     result = u@np.transpose(u)@face_image
 
     return result
@@ -220,8 +218,9 @@ class NumberOfComponents(object):
         For example: (1, 3)
         """
 
-        return (1,4) #Todo
+        return (1,4)
 
+#Function to compute eculidean distance of two vectors.
 def euclideanDistance(A, B):
     length = A.shape[0]
     sum = 0
@@ -268,12 +267,6 @@ def search(Y, x, u, top_n):
 
     #Sort distance values and filter top_n values.
     top_idx = np.asarray(distance).argsort()[:top_n]
-
-    # print(top_values)
-    # #Find top value's index and save to top_idx
-    # top_idx = []
-    # for j in top_values:
-    #     top_idx.append(distance.index(j))
 
     #Get corresponding original image vector from Y. (Each row is vector)
     result = np.empty([top_n, M])
