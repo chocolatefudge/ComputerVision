@@ -1,6 +1,11 @@
 import os
 import numpy as np
 from scipy.signal import convolve2d
+import matplotlib.pyplot as plt
+from PIL import Image
+import math
+
+
 
 #
 # Hint: you can make use of this function
@@ -23,7 +28,7 @@ def gaussian_kernel(fsize=3, sigma=1):
     return G / G.sum()
 
 def load_image(path):
-    ''' 
+    '''
     The input image is a)loaded, b) converted to greyscale, and c) converted to numpy array
 
     Args:
@@ -31,10 +36,18 @@ def load_image(path):
     Returns:
         img: numpy array containing image in greyscale
     '''
-    return np.empty((300, 300))
+    img = plt.imread(path, format = 'jpeg')
+    m,n,_ = img.shape
+    result = np.empty((m,n))
+
+    for i in range (m):
+        for j in range (n):
+            result[i][j] = 0.2126*img[i][j][0] + 0.7152*img[i][j][1] + 0.0772*img[i][j][2]
+
+    return result
 
 def smoothed_laplacian(image, sigmas, lap_kernel):
-    ''' 
+    '''
     The image is first smoothed by gaussian kernels for each sigma in the list of sigmas. Then laplacian operator is applied to each one.
 
     Args:
@@ -44,10 +57,19 @@ def smoothed_laplacian(image, sigmas, lap_kernel):
         response: 3 dimensional numpy array. The first (index 0) dimension is for scale
                   corresponding to sigmas
     '''
-    return np.empty((len(sigmas), *image.shape))
+
+    laplacian = laplacian_kernel()
+    result = np.empty((len(sigmas), *image.shape))
+    for i in range(len(sigmas)):
+        img_copy = image.copy()
+        gaussian = gaussian_kernel(7,sigmas[i])
+        temp = convolve2d(img_copy, gaussian, mode = 'same')
+        result[i] = convolve2d(temp, laplacian, mode = 'same')
+
+    return result
 
 def laplacian_of_gaussian(image, sigmas):
-    ''' 
+    '''
     Then laplacian of gaussian operator for every sigma in the list of sigmas is applied to the image.
 
     Args:
@@ -57,10 +79,16 @@ def laplacian_of_gaussian(image, sigmas):
         response: 3 dimensional numpy array. The first (index 0) dimension is for scale
                   corresponding to sigmas
     '''
-    return np.empty((len(sigmas), *image.shape))
+    result = np.empty((len(sigmas), *image.shape))
+    for i in range(len(sigmas)):
+        img_copy = image.copy()
+        filter = LoG_kernel(9, sigmas[i])
+        result[i] = convolve2d(image, filter, mode = 'same')
+
+    return result
 
 def difference_of_gaussian(image, sigmas):
-    ''' 
+    '''
     Then difference of gaussian operator for every sigma in the list of sigmas is applied to the image.
 
     Args:
@@ -70,7 +98,13 @@ def difference_of_gaussian(image, sigmas):
         response: 3 dimensional numpy array. The first (index 0) dimension is for scale
                   corresponding to sigmas
     '''
-    return np.empty((len(sigmas), *image.shape))
+    result = np.empty((len(sigmas), *image.shape))
+    for i in range(len(sigmas)):
+        img_copy = image.copy()
+        filter = DoG(sigmas[i])
+        result[i] = convolve2d(image, filter, mode = 'same')
+
+    return result
 
 def LoG_kernel(fsize=9, sigma=1):
     '''
@@ -83,7 +117,11 @@ def LoG_kernel(fsize=9, sigma=1):
     Returns:
         LoG kernel
     '''
-    return np.random.random((fsize, fsize))
+    gaussian = gaussian_kernel(fsize, sigma)
+    laplacian = laplacian_kernel()
+    result = convolve2d(gaussian, laplacian, mode = 'same')
+
+    return result
 
 def blob_detector(response):
     '''
@@ -95,7 +133,47 @@ def blob_detector(response):
     Returns:
         list of 3-tuples (scale_index, row, column) containing the detected points.
     '''
-    return []
+    temp = []
+    result = []
+    tt, w, h = response.shape
+    t = 1
+
+    for i in range(1, w-1):
+        for j in range(1, h-1):
+            temp.append(response[t][i][j])
+            temp.append(response[t][i][j-1])
+            temp.append(response[t][i][j+1])
+            temp.append(response[t][i-1][j])
+            temp.append(response[t][i-1][j-1])
+            temp.append(response[t][i-1][j+1])
+            temp.append(response[t][i+1][j])
+            temp.append(response[t][i+1][j-1])
+            temp.append(response[t][i+1][j+1])
+            temp.append(response[t-1][i][j])
+            temp.append(response[t-1][i][j-1])
+            temp.append(response[t-1][i][j+1])
+            temp.append(response[t-1][i-1][j])
+            temp.append(response[t-1][i-1][j-1])
+            temp.append(response[t-1][i-1][j+1])
+            temp.append(response[t-1][i+1][j])
+            temp.append(response[t-1][i+1][j-1])
+            temp.append(response[t-1][i+1][j+1])
+            temp.append(response[t+1][i][j])
+            temp.append(response[t+1][i][j-1])
+            temp.append(response[t+1][i][j+1])
+            temp.append(response[t+1][i-1][j])
+            temp.append(response[t+1][i-1][j-1])
+            temp.append(response[t+1][i-1][j+1])
+            temp.append(response[t+1][i+1][j])
+            temp.append(response[t+1][i+1][j-1])
+            temp.append(response[t+1][i+1][j+1])
+
+            if min(temp)==response[t][i][j] or max(temp)==response[t][i][j]:
+                result.append((t, i, j))
+
+            temp.clear()
+
+    return result
 
 def DoG(sigma):
     '''
@@ -108,7 +186,11 @@ def DoG(sigma):
     Returns:
         DoG kernel
     '''
-    return np.random.random((9, 9))
+    gaussian_1 = gaussian_kernel(7, sigma*math.sqrt(2))
+    gaussian_2 = gaussian_kernel(7, sigma/math.sqrt(2))
+
+    result = gaussian_1 - gaussian_2
+    return result
 
 def laplacian_kernel():
     '''
@@ -121,7 +203,7 @@ def laplacian_kernel():
     Returns:
         laplacian kernel
     '''
-    return np.random.random((3, 3))
+    return np.array([[0,-1,0], [-1,4,-1], [0,-1,0]])
 
 
 class Method(object):
@@ -140,5 +222,4 @@ class Method(object):
         This function returns a tuple containing indices of the correct answer.
         '''
 
-        return (None, )
-
+        return (1)
