@@ -10,7 +10,7 @@ import problem1 as p1
 
 def problem1():
     # Replace it with the right range
-    sigmas = [0.1, 0.2, 0.3]
+    sigmas = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75]
 
     image = p1.load_image("data/goat.jpeg")
     lap_kernel = p1.laplacian_kernel()
@@ -49,7 +49,7 @@ def problem2():
     plt.plot(pts2[:, 0], pts2[:, 1], 'ro', markersize=1.3)
 
     # display algined image
-    H, ix1, ix2 = p2.final_homography(im1, im2, pts1, pts2, feats_array[0],
+    H, ix1, ix2 = p2.final_homography(pts1, pts2, feats_array[0],
                                       feats_array[1])
 
     pts1 = pts1[ix1]
@@ -83,4 +83,4 @@ def problem2():
 
 if __name__ == "__main__":
     problem1()
-    problem2()
+    #problem2()

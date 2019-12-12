@@ -25,11 +25,13 @@ def gaussian_kernel(fsize=3, sigma=1):
     _x = _y = (fsize - 1) / 2
     x, y = np.mgrid[-_x:_x + 1, -_y:_y + 1]
     G = np.exp(-0.5 * (x**2 + y**2) / sigma**2)
+    G = G / (2 * math.pi * sigma**2)
     return G / G.sum()
 
 def load_image(path):
     '''
-    The input image is a)loaded, b) converted to greyscale, and c) converted to numpy array
+    The input image is a) loaded, b) converted to greyscale, and
+     c) converted to numpy array [-1, 1].
 
     Args:
         path: the name of the inpit image
@@ -44,11 +46,20 @@ def load_image(path):
         for j in range (n):
             result[i][j] = 0.2126*img[i][j][0] + 0.7152*img[i][j][1] + 0.0772*img[i][j][2]
 
+    max_v = result.max()
+    min_v = result.min()
+    for i in range (m):
+        for j in range (n):
+            result[i][j] = 2*(result[i][j] - min_v)/(max_v - min_v) - 1
+
     return result
 
+
 def smoothed_laplacian(image, sigmas, lap_kernel):
-    '''
-    The image is first smoothed by gaussian kernels for each sigma in the list of sigmas. Then laplacian operator is applied to each one.
+    ''' 
+    Then laplacian operator is applied to the image and
+     smoothed by gaussian kernels for each sigma in the list of sigmas.
+
 
     Args:
         Image: input image
@@ -63,13 +74,13 @@ def smoothed_laplacian(image, sigmas, lap_kernel):
     for i in range(len(sigmas)):
         img_copy = image.copy()
         gaussian = gaussian_kernel(7,sigmas[i])
-        temp = convolve2d(img_copy, gaussian, mode = 'same')
-        result[i] = convolve2d(temp, laplacian, mode = 'same')
+        temp = convolve2d(img_copy, laplacian, mode = 'same', boundary="symm")
+        result[i,:,:] = convolve2d(temp, gaussian, mode = 'same', boundary="symm")
 
     return result
 
 def laplacian_of_gaussian(image, sigmas):
-    '''
+    ''' 
     Then laplacian of gaussian operator for every sigma in the list of sigmas is applied to the image.
 
     Args:
@@ -83,7 +94,7 @@ def laplacian_of_gaussian(image, sigmas):
     for i in range(len(sigmas)):
         img_copy = image.copy()
         filter = LoG_kernel(9, sigmas[i])
-        result[i] = convolve2d(image, filter, mode = 'same')
+        result[i,:,:] = convolve2d(img_copy, filter, mode = 'same', boundary="symm")
 
     return result
 
@@ -102,7 +113,7 @@ def difference_of_gaussian(image, sigmas):
     for i in range(len(sigmas)):
         img_copy = image.copy()
         filter = DoG(sigmas[i])
-        result[i] = convolve2d(image, filter, mode = 'same')
+        result[i,:,:] = convolve2d(img_copy, filter, mode = 'same', boundary="symm")
 
     return result
 
@@ -117,62 +128,80 @@ def LoG_kernel(fsize=9, sigma=1):
     Returns:
         LoG kernel
     '''
-    gaussian = gaussian_kernel(fsize, sigma)
-    laplacian = laplacian_kernel()
-    result = convolve2d(gaussian, laplacian, mode = 'same')
+    _x = _y = (fsize - 1) / 2
+    x, y = np.mgrid[-_x:_x + 1, -_y:_y + 1]
+    G = np.exp(-0.5 * (x**2 + y**2) / (sigma**2)) * (1-(0.5 * (x**2 + y**2) / (sigma**2)))
+    G = G / (-math.pi * (sigma**4))
+    return G 
 
-    return result
+def detect_maxima(response, k, i, j):
+    d,w,h = response.shape
+    if (i<4 or j<4 or i>w-5 or j>h-5):
+        return (-1,i,j)
+    
+    target = response[k][i][j]
+    for k_idx in range(d):
+        for i_idx in range(-4,5):
+            for j_idx in range(-4,5):
+                if(target<=response[k_idx][i+i_idx][j+j_idx]):
+                    if(k_idx==k and i_idx==0 and j_idx==0):
+                        continue
+                    else:
+                        return (-1,i,j)
+    
+    return (k, i, j)
+
+def detect_minima(response, k, i, j):
+    d,w,h = response.shape
+    if (i<4 or j<4 or i>w-5 or j>h-5):
+        return (-1,i,j)
+    
+    target = response[k][i][j]
+    for k_idx in range(d):
+        for i_idx in range(-4,5):
+            for j_idx in range(-4,5):
+                if(target>=response[k_idx][i+i_idx][j+j_idx]):
+                    if(k_idx==k and i_idx==0 and j_idx==0):
+                        continue
+                    else:
+                        return (-1,i,j)
+    
+    return (k, i, j)
+
 
 def blob_detector(response):
     '''
-    Find points with a response which is either maximum or minimum in their 3x3x3 neighborhood of scale space array.
-    Tip: Ignore the first and the last row in every dimension for simplicity.
+    Find unique extrema points (maximum or minimum) in the response using 9x9 spatial neighborhood 
+    and across the complete scale dimension.
+    Tip: Ignore the boundary windows to avoid the need of padding for simplicity.
+    Tip 2: unique here means skipping an extrema point if there is another point in the local window
+            with the same value
     Args:
         response: 3 dimensional response from LoG operator in scale space.
 
     Returns:
         list of 3-tuples (scale_index, row, column) containing the detected points.
     '''
-    temp = []
+
     result = []
-    tt, w, h = response.shape
-    t = 1
+    d, w, h = response.shape
 
-    for i in range(1, w-1):
-        for j in range(1, h-1):
-            temp.append(response[t][i][j])
-            temp.append(response[t][i][j-1])
-            temp.append(response[t][i][j+1])
-            temp.append(response[t][i-1][j])
-            temp.append(response[t][i-1][j-1])
-            temp.append(response[t][i-1][j+1])
-            temp.append(response[t][i+1][j])
-            temp.append(response[t][i+1][j-1])
-            temp.append(response[t][i+1][j+1])
-            temp.append(response[t-1][i][j])
-            temp.append(response[t-1][i][j-1])
-            temp.append(response[t-1][i][j+1])
-            temp.append(response[t-1][i-1][j])
-            temp.append(response[t-1][i-1][j-1])
-            temp.append(response[t-1][i-1][j+1])
-            temp.append(response[t-1][i+1][j])
-            temp.append(response[t-1][i+1][j-1])
-            temp.append(response[t-1][i+1][j+1])
-            temp.append(response[t+1][i][j])
-            temp.append(response[t+1][i][j-1])
-            temp.append(response[t+1][i][j+1])
-            temp.append(response[t+1][i-1][j])
-            temp.append(response[t+1][i-1][j-1])
-            temp.append(response[t+1][i-1][j+1])
-            temp.append(response[t+1][i+1][j])
-            temp.append(response[t+1][i+1][j-1])
-            temp.append(response[t+1][i+1][j+1])
+    percentile_min = np.percentile(response, 0.1)
+    print(percentile_min)
+    percentile_max = np.percentile(response, 99.9)
+    print(percentile_max)
 
-            if min(temp)==response[t][i][j] or max(temp)==response[t][i][j]:
-                result.append((t, i, j))
+    for k in range(d):
+        for i in range(w):
+            for j in range(h):
+                if response[k][i][j]>=percentile_max:
+                    if(detect_maxima(response, k, i, j)[0]>=0):
+                        result.append((k, i, j))
+                elif response[k][i][j]<=percentile_min:
+                    if (detect_minima(response, k, i, j)[0]>=0):
+                        result.append((k,i,j))
 
-            temp.clear()
-
+    print(result)
     return result
 
 def DoG(sigma):
@@ -186,8 +215,8 @@ def DoG(sigma):
     Returns:
         DoG kernel
     '''
-    gaussian_1 = gaussian_kernel(7, sigma*math.sqrt(2))
-    gaussian_2 = gaussian_kernel(7, sigma/math.sqrt(2))
+    gaussian_1 = gaussian_kernel(9, sigma*math.sqrt(2))
+    gaussian_2 = gaussian_kernel(9, sigma/math.sqrt(2))
 
     result = gaussian_1 - gaussian_2
     return result
