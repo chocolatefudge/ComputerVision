@@ -187,9 +187,7 @@ def blob_detector(response):
     d, w, h = response.shape
 
     percentile_min = np.percentile(response, 0.1)
-    print(percentile_min)
     percentile_max = np.percentile(response, 99.9)
-    print(percentile_max)
 
     for k in range(d):
         for i in range(w):
@@ -201,7 +199,6 @@ def blob_detector(response):
                     if (detect_minima(response, k, i, j)[0]>=0):
                         result.append((k,i,j))
 
-    print(result)
     return result
 
 def DoG(sigma):

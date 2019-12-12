@@ -18,7 +18,7 @@ def load_pts_features(path):
     """
 
     #idk part how to load the points from npz file
-    data = np.load('data/pts_feats.npz') # loading data
+    data = np.load(path) # loading data
     lst = data.files # It includes the key pts and feats
 
     # Using keys, get the data

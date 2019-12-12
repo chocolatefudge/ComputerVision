@@ -10,7 +10,7 @@ import problem1 as p1
 
 def problem1():
     # Replace it with the right range
-    sigmas = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75]
+    sigmas = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75]
 
     image = p1.load_image("data/goat.jpeg")
     lap_kernel = p1.laplacian_kernel()
@@ -78,9 +78,9 @@ def problem2():
                                      method=Image.PERSPECTIVE,
                                      data=H_inv.ravel(),
                                      resample=Image.BICUBIC)
-
+    plt.imshow(im3)
     plt.show()
 
 if __name__ == "__main__":
     problem1()
-    #problem2()
+    problem2()
