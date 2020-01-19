@@ -10,7 +10,7 @@ def cost_ssd(patch1, patch2):
     Returns:
         cost_ssd: the calcuated SSD cost as a floating point value
     """
-
+    # just subtract each other and squre it and calculate the sum
     cost_ssd = ((patch1-patch2)**2).sum()
     assert np.isscalar(cost_ssd)
     return cost_ssd
@@ -27,10 +27,14 @@ def cost_nc(patch1, patch2):
         cost_nc: the calcuated NC cost as a floating point value
     """
     m = patch1.shape[0]
+
+    # make it to the shape m**2,1 so that easily calculate the process
     repatch1 = np.reshape(patch1, (m**2,1))
     repatch2 = np.reshape(patch2, (m**2,1))
+    # Get the mean for each vector
     w1_mean = np.mean(repatch1)
     w2_mean = np.mean(repatch2)
+    # Do the caculation as noted in the hw document
     cost_nc = np.dot(np.transpose(repatch1-w1_mean),repatch2-w2_mean)[0][0]
     cost_nc /= np.linalg.norm(repatch1-w1_mean)*np.linalg.norm(repatch2-w2_mean)
 
@@ -52,6 +56,8 @@ def cost_function(patch1, patch2, alpha):
 
     assert patch1.shape == patch2.shape
     m = patch1.shape[0]
+
+    # Using ssd and nc, caculate the cost from the document
     cost_val = cost_ssd(patch1, patch2)/(m**2) + alpha*cost_nc(patch1, patch2)
 
     assert np.isscalar(cost_val)
@@ -72,7 +78,11 @@ def pad_image(input_img, window_size, padding_mode='symmetric'):
     assert np.isscalar(window_size)
     assert window_size % 2 == 1
 
+    # Padding width must be window_size-1 and divided by 2. So that we can check every pixels
     pad_width = int((window_size-1)/2)
+    # For each padding_mode, pad differently
+
+    # But in result, I chose symmetric cause it seems to have smallest aepe
     if padding_mode == 'symmetric':
         padded_img = np.pad(input_img, pad_width, padding_mode)
     elif padding_mode == 'reflect':
@@ -102,20 +112,31 @@ def compute_disparity(padded_img_l, padded_img_r, max_disp, window_size, alpha):
     assert max_disp > 0
     assert window_size % 2 == 1
 
+    # Each are original size of the Image
     origin_m = padded_img_l.shape[0]-window_size+1
     origin_n = padded_img_l.shape[1]-window_size+1
+
+    # disparity should have same size with original image
     disparity = np.zeros((origin_m, origin_n))
+
+    # For origin_m and origin_n times, need to be checked
     for i in range(origin_m):
         for j in range(origin_n):
+            # Crop the image with window size
             patch1 = padded_img_l[i:i+window_size, j:j+window_size]
+            # Make min_cost and min_disp have no value at the first time
             min_cost = None
             min_disp = None
+            # Need to check left and right side as much as max_disp
             for k in range(-max_disp, max_disp+1):
+                # when at the edge, cannot be checked
                 if j-k<0:
                     continue
                 if j-k+window_size> padded_img_r.shape[1]:
                     continue
+                # Crop the right image to window size
                 patch2 = padded_img_r[i:i+window_size, j-k:j+window_size-k]
+                # Check the cost, and keep track the cost and disparity at the time
                 cost = cost_function(patch1, patch2, alpha)
                 if min_cost == None:
                     min_cost = cost
@@ -123,6 +144,7 @@ def compute_disparity(padded_img_l, padded_img_r, max_disp, window_size, alpha):
                 elif cost < min_cost:
                     min_cost = cost
                     min_disp = k
+            # Put disparity at disparity map when it has the lowest cost
             disparity[i,j] = min_disp
 
     assert disparity.ndim == 2
@@ -142,8 +164,9 @@ def compute_aepe(disparity_gt, disparity_res):
     assert disparity_res.ndim == 2
     assert disparity_gt.shape == disparity_res.shape
 
+    # Caculate the size to divide
     size = disparity_gt.shape[0]*disparity_gt.shape[1]
-
+    # Get the aepe as the equation in the document
     aepe = np.sum(np.absolute(disparity_gt-disparity_res))/size
 
     assert np.isscalar(aepe)
@@ -153,6 +176,7 @@ def optimal_alpha():
     """Return alpha that leads to the smallest EPE
     (w.r.t. other values)"""
 
+    # When I checked all of alphas, -0.01 was the best
     alpha = -0.01
     # np.random.choice([-0.06, -0.01, 0.04, 0.1])
     return alpha
