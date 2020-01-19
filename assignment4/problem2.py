@@ -58,7 +58,7 @@ def cost_function(patch1, patch2, alpha):
     return cost_val
 
 
-def pad_image(input_img, window_size, padding_mode):
+def pad_image(input_img, window_size, padding_mode='symmetric'):
     """Output the padded image
 
     Args:
@@ -110,7 +110,7 @@ def compute_disparity(padded_img_l, padded_img_r, max_disp, window_size, alpha):
             patch1 = padded_img_l[i:i+window_size, j:j+window_size]
             min_cost = None
             min_disp = None
-            for k in range(-15, 16):
+            for k in range(-max_disp, max_disp+1):
                 if j-k<0:
                     continue
                 if j-k+window_size> padded_img_r.shape[1]:
