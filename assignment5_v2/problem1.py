@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.interpolate import griddata
+import scipy.signal as signal
 
 ######################
 # Basic Lucas-Kanade #
@@ -23,12 +25,66 @@ def compute_derivatives(im1, im2):
     #
     # Your code here
     #
+
+    sx = np.array([[-1,0,1],[-2,0,2],[-1,0,1]])
+    sy = np.array([[-1,-2,-1], [0,0,0], [1,2,1]])
+
+    Ix = signal.convolve2d(im1, sx, mode = "same")
+    Iy = signal.convolve2d(im1, sy, mode = "same")
+    It = im2-im1
     
     assert Ix.shape == im1.shape and \
            Iy.shape == im1.shape and \
            It.shape == im1.shape
 
     return Ix, Iy, It
+
+def padding(x, y, m, n):
+    if x<0:
+        x = -x
+    elif x>=m:
+        x = 2*m-x-1
+    
+    if y<0:
+        y = -y
+    elif y>=n:
+        y = 2*n-y-1
+
+    return x,y
+
+def calculate_uv(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n):
+
+    t = patch_size//2
+
+    X_ssum, Y_ssum, XY_sum, XT_sum, YT_sum = 0, 0, 0, 0, 0
+    
+    for i1 in range(-t, t+1):
+        for j1 in range(-t, t+1):
+            xc = x+i1
+            yc = y+j1
+            i, j = padding(xc,yc,m,n)
+            X_ssum += Xss[i][j]
+            Y_ssum += Yss[i][j]
+            XY_sum += XYs[i][j]
+            XT_sum += XTs[i][j]
+            YT_sum += YTs[i][j]
+
+    A = np.array([[X_ssum, XY_sum], [XY_sum, Y_ssum]])
+    B = np.array([-XT_sum, -YT_sum])
+
+    
+    result = np.linalg.inv(A)@B.T 
+
+    return result[0], result[1]
+
+def pre_calc(Ix, Iy, It):
+    Xss = np.multiply(Ix, Ix)
+    Yss = np.multiply(Iy, Iy)
+    XYs = np.multiply(Ix, Iy)
+    XTs = np.multiply(Ix, It)
+    YTs = np.multiply(Iy, It)
+
+    return Xss, Yss, XYs, XTs, YTs
 
 def compute_motion(Ix, Iy, It, patch_size=15, aggregate="const", sigma=2):
     """Computes one iteration of optical flow estimation.
@@ -53,9 +109,19 @@ def compute_motion(Ix, Iy, It, patch_size=15, aggregate="const", sigma=2):
     #
     # Your code here
     #
-    
+
+    m, n = Ix.shape
+    Xss, Yss, XYs, XTs, YTs = pre_calc(Ix, Iy, It)
+
+    for i in range (m):
+        for j in range (n):
+            uv, vv = calculate_uv(i,j,patch_size,Xss, Yss, XYs, XTs, YTs, m, n)
+            u[i][j] = uv 
+            v[i][j] = vv
+
     assert u.shape == Ix.shape and \
             v.shape == Ix.shape
+
     return u, v
 
 def warp(im, u, v):
@@ -76,7 +142,19 @@ def warp(im, u, v):
     # Your code here
     #
 
+    m, n = im.shape
+    data1 = []
+    data2 = []
+    for i in range(m):
+        for j in range(n):
+            data1.append((i+u[i][j], j+v[i][j]))
+            data2.append(im[i][j])
+    
+    grid_x, grid_y = np.mgrid[0:m, 0:n]
+    im_warp = griddata(data1, data2, (grid_x, grid_y))
+
     assert im_warp.shape == im.shape
+
     return im_warp
 
 def compute_cost(im1, im2):
@@ -88,6 +166,12 @@ def compute_cost(im1, im2):
     # Your code here
     #
 
+    Ix, Iy, It = compute_derivatives(im1, im2)
+    u, v = compute_motion(Ix, Iy, It)
+
+    d = np.sum(np.square(np.multiply(u, Ix) + np.multiply(v, Iy) + It))
+
+    
     assert isinstance(d, float)
     return d
 
