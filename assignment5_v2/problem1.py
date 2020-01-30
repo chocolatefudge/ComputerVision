@@ -18,6 +18,7 @@ def compute_derivatives(im1, im2):
     """
     assert im1.shape == im2.shape
     
+    print(im1.shape)
     Ix = np.empty_like(im1)
     Iy = np.empty_like(im1)
     It = np.empty_like(im1)
@@ -26,9 +27,12 @@ def compute_derivatives(im1, im2):
     # Your code here
     #
 
+    #Filter for calculating derivations along the x and y directions
     sx = np.array([[-1,0,1],[-2,0,2],[-1,0,1]])
     sy = np.array([[-1,-2,-1], [0,0,0], [1,2,1]])
 
+
+    #Calculating Ix and Iy by using convolution 
     Ix = signal.convolve2d(im1, sx, mode = "same")
     Iy = signal.convolve2d(im1, sy, mode = "same")
     It = im2-im1
@@ -39,30 +43,44 @@ def compute_derivatives(im1, im2):
 
     return Ix, Iy, It
 
-def padding(x, y, m, n):
-    if x<0:
-        x = -x
-    elif x>=m:
-        x = 2*m-x-1
-    
-    if y<0:
-        y = -y
-    elif y>=n:
-        y = 2*n-y-1
+def padding(x, y, xc, yc, m, n):
+    '''
+    Because we're applying 15*15 window size for each pixels, 
+    there can be some edge cases where index goes out of the boundary. 
+    In these cases, mirror padding is used. 
+    '''
 
-    return x,y
+    #Edge cases: where index<0 or larger than matrix size. 
+    if xc<0:
+        xc = 2*x-xc
+    elif xc>=m:
+        xc = 2*x-xc
+    
+    if yc<0:
+        yc = 2*y-yc
+    elif yc>=n:
+        yc = 2*y-yc
+
+    return xc,yc
 
 def calculate_uv(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n):
 
+    '''
+    Function that calculates u and v for each pixels. 
+    Gets index, matrix size, and patch size as an input(as well as pre-calculated matrixes)
+    and returns u and v.
+    '''
+    
     t = patch_size//2
-
+    
     X_ssum, Y_ssum, XY_sum, XT_sum, YT_sum = 0, 0, 0, 0, 0
     
+    #For each pixels, calculate sum of each 15*15 window 
     for i1 in range(-t, t+1):
         for j1 in range(-t, t+1):
             xc = x+i1
             yc = y+j1
-            i, j = padding(xc,yc,m,n)
+            i, j = padding(x, y, xc,yc,m,n)
             X_ssum += Xss[i][j]
             Y_ssum += Yss[i][j]
             XY_sum += XYs[i][j]
@@ -72,12 +90,16 @@ def calculate_uv(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n):
     A = np.array([[X_ssum, XY_sum], [XY_sum, Y_ssum]])
     B = np.array([-XT_sum, -YT_sum])
 
-    
+    #Compute result by A^(-1)*B
     result = np.linalg.inv(A)@B.T 
 
     return result[0], result[1]
 
 def pre_calc(Ix, Iy, It):
+    '''
+    Pre-calculation procedure of the matrix which we need to get u and v in calculate_uv
+    '''
+
     Xss = np.multiply(Ix, Ix)
     Yss = np.multiply(Iy, Iy)
     XYs = np.multiply(Ix, Iy)
@@ -170,7 +192,7 @@ def compute_cost(im1, im2):
     u, v = compute_motion(Ix, Iy, It)
 
     d = np.sum(np.square(np.multiply(u, Ix) + np.multiply(v, Iy) + It))
-
+    # d = np.sum(np.square(im1-im2))
     
     assert isinstance(d, float)
     return d
