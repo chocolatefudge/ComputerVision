@@ -151,7 +151,7 @@ def warp(im, u, v):
             data2.append(im[i][j])
     
     grid_x, grid_y = np.mgrid[0:m, 0:n]
-    im_warp = griddata(data1, data2, (grid_x, grid_y))
+    im_warp = griddata(np.asarray(data1), np.asarray(data2), (grid_x, grid_y), method = 'nearest')
 
     assert im_warp.shape == im.shape
 
