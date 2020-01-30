@@ -18,7 +18,6 @@ def compute_derivatives(im1, im2):
     """
     assert im1.shape == im2.shape
     
-    print(im1.shape)
     Ix = np.empty_like(im1)
     Iy = np.empty_like(im1)
     It = np.empty_like(im1)
@@ -80,12 +79,52 @@ def calculate_uv(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n):
         for j1 in range(-t, t+1):
             xc = x+i1
             yc = y+j1
-            i, j = padding(x, y, xc,yc,m,n)
-            X_ssum += Xss[i][j]
-            Y_ssum += Yss[i][j]
-            XY_sum += XYs[i][j]
-            XT_sum += XTs[i][j]
-            YT_sum += YTs[i][j]
+            #i, j = padding(x, y, xc,yc,m,n)
+            X_ssum += Xss[xc][yc]
+            Y_ssum += Yss[xc][yc]
+            XY_sum += XYs[xc][yc]
+            XT_sum += XTs[xc][yc]
+            YT_sum += YTs[xc][yc]
+
+    A = np.array([[X_ssum, XY_sum], [XY_sum, Y_ssum]])
+    B = np.array([-XT_sum, -YT_sum])
+
+    #Compute result by A^(-1)*B
+    result = np.linalg.inv(A)@B.T 
+
+    return result[0], result[1]
+
+def calculate_uv_gaussian(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n, sigma):
+
+    '''
+    Function that calculates u and v for each pixels. 
+    Gets index, matrix size, and patch size as an input(as well as pre-calculated matrixes)
+    and returns u and v.
+    '''
+    
+    t = patch_size//2
+    
+    X_ssum, Y_ssum, XY_sum, XT_sum, YT_sum = 0, 0, 0, 0, 0
+    
+    #For each pixels, calculate sum of each 15*15 window 
+    Xss_calc = Xss[x-t:x+t+1][y-t:y+t+1]
+    Yss_calc = Yss[x-t:x+t+1][y-t:y+t+1]
+    XYs_calc = XYs[x-t:x+t+1][y-t:y+t+1]
+    XTs_calc = XTs[x-t:x+t+1][y-t:y+t+1]
+    YTs_calc = YTs[x-t:x+t+1][y-t:y+t+1]
+
+    filter = gaussian_kernel(5, sigma)
+    Xss_calc = signal.convolve2d(Xss_calc, filter, mode="same")
+    Yss_calc = signal.convolve2d(Xss_calc, filter, mode="same")
+    XYs_calc = signal.convolve2d(Xss_calc, filter, mode="same")
+    XTs_calc = signal.convolve2d(Xss_calc, filter, mode="same")
+    YTs_calc = signal.convolve2d(Xss_calc, filter, mode="same")
+
+    X_ssum = np.sum(Xss_calc)
+    Y_ssum = np.sum(Yss_calc)
+    XY_sum = np.sum(XY_sum)
+    XT_sum = np.sum(XT_sum)
+    YT_sum = np.sum(YT_sum)
 
     A = np.array([[X_ssum, XY_sum], [XY_sum, Y_ssum]])
     B = np.array([-XT_sum, -YT_sum])
@@ -131,15 +170,41 @@ def compute_motion(Ix, Iy, It, patch_size=15, aggregate="const", sigma=2):
     #
     # Your code here
     #
+    if aggregate=="const":
+        t = patch_size//2
 
-    m, n = Ix.shape
-    Xss, Yss, XYs, XTs, YTs = pre_calc(Ix, Iy, It)
+        Ix_pad = np.pad(Ix, t, mode='reflect')
+        Iy_pad = np.pad(Iy, t, mode='reflect')
+        It_pad = np.pad(It, t, mode='reflect')
 
-    for i in range (m):
-        for j in range (n):
-            uv, vv = calculate_uv(i,j,patch_size,Xss, Yss, XYs, XTs, YTs, m, n)
-            u[i][j] = uv 
-            v[i][j] = vv
+        m, n = Ix.shape
+        Xss, Yss, XYs, XTs, YTs = pre_calc(Ix_pad, Iy_pad, It_pad)
+
+        for i in range (t, m+t):
+            for j in range (t, n+t):
+                uv, vv = calculate_uv(i,j,patch_size,Xss, Yss, XYs, XTs, YTs, m, n)
+                u[i-t][j-t] = uv
+                v[i-t][j-t] = vv
+
+    elif aggregate=="gaussian":
+        t = patch_size//2
+
+        Ix_pad = np.pad(Ix, t, mode='reflect')
+        Iy_pad = np.pad(Iy, t, mode='reflect')
+        It_pad = np.pad(It, t, mode='reflect')
+
+        m, n = Ix.shape
+        Xss, Yss, XYs, XTs, YTs = pre_calc(Ix_pad, Iy_pad, It_pad)
+
+        for i in range (t, m+t):
+            for j in range (t, n+t):
+                uv, vv = calculate_uv_gaussian(i,j,patch_size,Xss, Yss, XYs, XTs, YTs, m, n, sigma)
+                u[i-t][j-t] = uv
+                v[i-t][j-t] = vv
+
+    else:
+        print("Aggregation Error")
+        return None
 
     assert u.shape == Ix.shape and \
             v.shape == Ix.shape
@@ -235,12 +300,21 @@ def downsample_x2(x, fsize=5, sigma=1.4):
         downsampled image as numpy array (H/2 x W/2)
     """
 
+    # Getting the height and width from x
+    H, W = x.shape
+    # Making the empty array sized H/2 * W/2
+    downsample = np.empty((H//2, W//2))
 
-    #
-    # Your code here
-    #
+    # Just put average of 4 values from 4 places to 1 place
+    # Using np.mean method
+    # It makes things downsampled by factor of 2
+    for i in range(H//2):
+        for j in range(W//2):
+            # Using numpy mean function
+            arr = [x[i*2,j*2],x[i*2+1,j*2],x[i*2,j*2+1],x[i*2+1, j*2+1]]
+            downsample[i, j] = np.mean(arr)
 
-    return x
+    return downsample
 
 def gaussian_pyramid(img, nlevels=3, fsize=5, sigma=1.4):
     '''
@@ -256,12 +330,21 @@ def gaussian_pyramid(img, nlevels=3, fsize=5, sigma=1.4):
     Returns:
         GP: list of gaussian downsampled images in ascending order of resolution
     '''
-    
-    #
-    # Your code here
-    #
 
-    return [img]
+    GP = []
+
+    # Appending first original img
+    GP.append(img)
+
+    # For nlevls-1 times
+    for i in range(nlevels-1):
+        # First, filter with the gaussian kernel
+        img = convolve2d(img, gaussian_kernel(fsize, sigma), mode = 'same', boundary = 'symm')
+        # And do the downsampling
+        img = downsample_x2(img, fsize, sigma)
+        GP.append(img)
+
+    return GP
 
 ###############################
 # Coarse-to-fine Lucas-Kanade #
