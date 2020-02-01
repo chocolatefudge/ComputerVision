@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import griddata
 import scipy.signal as signal
+from scipy.signal import convolve2d
 
 ######################
 # Basic Lucas-Kanade #
@@ -8,16 +9,16 @@ import scipy.signal as signal
 
 def compute_derivatives(im1, im2):
     """Compute dx, dy and dt derivatives.
-    
+
     Args:
         im1: first image
         im2: second image
-    
+
     Returns:
         Ix, Iy, It: derivatives of im1 w.r.t. x, y and t
     """
     assert im1.shape == im2.shape
-    
+
     Ix = np.empty_like(im1)
     Iy = np.empty_like(im1)
     It = np.empty_like(im1)
@@ -27,54 +28,34 @@ def compute_derivatives(im1, im2):
     #
 
     #Filter for calculating derivations along the x and y directions
-    sx = np.array([[-1,0,1],[-2,0,2],[-1,0,1]])
-    sy = np.array([[-1,-2,-1], [0,0,0], [1,2,1]])
+    sx = np.array([[1,0,-1],[2,0,-2],[1,0,-1]])
+    sy = np.array([[1,2,1], [0,0,0], [-1,-2,-1]])
 
-
-    #Calculating Ix and Iy by using convolution 
+    #Calculating Ix and Iy by using convolution
     Ix = signal.convolve2d(im1, sx, mode = "same")
     Iy = signal.convolve2d(im1, sy, mode = "same")
     It = im2-im1
-    
+
     assert Ix.shape == im1.shape and \
            Iy.shape == im1.shape and \
            It.shape == im1.shape
 
     return Ix, Iy, It
 
-def padding(x, y, xc, yc, m, n):
-    '''
-    Because we're applying 15*15 window size for each pixels, 
-    there can be some edge cases where index goes out of the boundary. 
-    In these cases, mirror padding is used. 
-    '''
-
-    #Edge cases: where index<0 or larger than matrix size. 
-    if xc<0:
-        xc = 2*x-xc
-    elif xc>=m:
-        xc = 2*x-xc
-    
-    if yc<0:
-        yc = 2*y-yc
-    elif yc>=n:
-        yc = 2*y-yc
-
-    return xc,yc
 
 def calculate_uv(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n):
 
     '''
-    Function that calculates u and v for each pixels. 
+    Function that calculates u and v for each pixels.
     Gets index, matrix size, and patch size as an input(as well as pre-calculated matrixes)
     and returns u and v.
     '''
-    
+
     t = patch_size//2
-    
+
     X_ssum, Y_ssum, XY_sum, XT_sum, YT_sum = 0, 0, 0, 0, 0
-    
-    #For each pixels, calculate sum of each 15*15 window 
+
+    #For each pixels, calculate sum of each 15*15 window
     for i1 in range(-t, t+1):
         for j1 in range(-t, t+1):
             xc = x+i1
@@ -90,35 +71,35 @@ def calculate_uv(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n):
     B = np.array([-XT_sum, -YT_sum])
 
     #Compute result by A^(-1)*B
-    result = np.linalg.inv(A)@B.T 
+    result = np.linalg.inv(A)@B.T
 
     return result[0], result[1]
 
 def calculate_uv_gaussian(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n, sigma):
 
     '''
-    Function that calculates u and v for each pixels. 
+    Function that calculates u and v for each pixels.
     Gets index, matrix size, and patch size as an input(as well as pre-calculated matrixes)
     and returns u and v.
     '''
-    
+
     t = patch_size//2
-    
+
     X_ssum, Y_ssum, XY_sum, XT_sum, YT_sum = 0, 0, 0, 0, 0
-    
-    #For each pixels, calculate sum of each 15*15 window 
+
+    #For each pixels, calculate sum of each 15*15 window
     Xss_calc = Xss[x-t:x+t+1][y-t:y+t+1]
     Yss_calc = Yss[x-t:x+t+1][y-t:y+t+1]
     XYs_calc = XYs[x-t:x+t+1][y-t:y+t+1]
     XTs_calc = XTs[x-t:x+t+1][y-t:y+t+1]
     YTs_calc = YTs[x-t:x+t+1][y-t:y+t+1]
 
-    filter = gaussian_kernel(5, sigma)
-    Xss_calc = signal.convolve2d(Xss_calc, filter, mode="same")
-    Yss_calc = signal.convolve2d(Xss_calc, filter, mode="same")
-    XYs_calc = signal.convolve2d(Xss_calc, filter, mode="same")
-    XTs_calc = signal.convolve2d(Xss_calc, filter, mode="same")
-    YTs_calc = signal.convolve2d(Xss_calc, filter, mode="same")
+    filter = gaussian_kernel(15, sigma)
+    Xss_calc = Xss_calc@ filter
+    Yss_calc = Yss_calc@ filter
+    XYs_calc = XYs_calc@ filter
+    XTs_calc = XTs_calc@ filter
+    YTs_calc = YTs_calc@ filter
 
     X_ssum = np.sum(Xss_calc)
     Y_ssum = np.sum(Yss_calc)
@@ -130,7 +111,7 @@ def calculate_uv_gaussian(x,y,patch_size, Xss, Yss, XYs, XTs, YTs, m, n, sigma):
     B = np.array([-XT_sum, -YT_sum])
 
     #Compute result by A^(-1)*B
-    result = np.linalg.inv(A)@B.T 
+    result = np.linalg.inv(A)@B.T
 
     return result[0], result[1]
 
@@ -149,7 +130,7 @@ def pre_calc(Ix, Iy, It):
 
 def compute_motion(Ix, Iy, It, patch_size=15, aggregate="const", sigma=2):
     """Computes one iteration of optical flow estimation.
-    
+
     Args:
         Ix, Iy, It: image derivatives w.r.t. x, y and t
         patch_size: specifies the side of the square region R in Eq. (1)
@@ -158,7 +139,7 @@ def compute_motion(Ix, Iy, It, patch_size=15, aggregate="const", sigma=2):
     Returns:
         u: optical flow in x direction
         v: optical flow in y direction
-    
+
     All outputs have the same dimensionality as the input
     """
     assert Ix.shape == Iy.shape and \
@@ -213,17 +194,17 @@ def compute_motion(Ix, Iy, It, patch_size=15, aggregate="const", sigma=2):
 
 def warp(im, u, v):
     """Warping of a given image using provided optical flow.
-    
+
     Args:
         im: input image
         u, v: optical flow in x and y direction
-    
+
     Returns:
         im_warp: warped image (of the same size as input image)
     """
     assert im.shape == u.shape and \
             u.shape == v.shape
-    
+
     im_warp = np.empty_like(im)
     #
     # Your code here
@@ -236,9 +217,9 @@ def warp(im, u, v):
         for j in range(n):
             data1.append((i+u[i][j], j+v[i][j]))
             data2.append(im[i][j])
-    
+
     grid_x, grid_y = np.mgrid[0:m, 0:n]
-    im_warp = griddata(np.asarray(data1), np.asarray(data2), (grid_x, grid_y), method = 'nearest')
+    im_warp = griddata(np.asarray(data1), np.asarray(data2), (grid_x, grid_y), method = 'linear', fill_value = 0)
 
     assert im_warp.shape == im.shape
 
@@ -258,7 +239,7 @@ def compute_cost(im1, im2):
 
     d = np.sum(np.square(np.multiply(u, Ix) + np.multiply(v, Iy) + It))
     # d = np.sum(np.square(im1-im2))
-    
+
     assert isinstance(d, float)
     return d
 
@@ -344,7 +325,12 @@ def gaussian_pyramid(img, nlevels=3, fsize=5, sigma=1.4):
         img = downsample_x2(img, fsize, sigma)
         GP.append(img)
 
-    return GP
+    GP_ascend = []
+
+    for i in range(nlevels):
+        GP_ascend.append(GP.pop())
+
+    return GP_ascend
 
 ###############################
 # Coarse-to-fine Lucas-Kanade #
@@ -353,25 +339,54 @@ def gaussian_pyramid(img, nlevels=3, fsize=5, sigma=1.4):
 def coarse_to_fine(im1, im2, pyramid1, pyramid2, n_iter=3):
     """Implementation of coarse-to-fine strategy
     for optical flow estimation.
-    
+
     Args:
         im1, im2: first and second image
         pyramid1, pyramid2: Gaussian pyramids corresponding to im1 and im2
         n_iter: number of refinement iterations
-    
+
     Returns:
         u: OF in x direction
         v: OF in y direction
     """
     assert im1.shape == im2.shape
-    
+
     u = np.zeros_like(im1)
     v = np.zeros_like(im1)
+    pyramid_len = len(pyramid1)
 
-    #
-    # Your code here
-    #
-    
+    # for i in range(pyramid_len):
+    #     print(i)
+    #     img1 = pyramid1[i]
+    #     img2 = pyramid2[i]
+    #     if i!=0:
+    #         img1 = warp(img1, u, v)
+    #     for k in range(n_iter):
+    #         Ix, Iy, It = compute_derivatives(img1,img2)
+    #         u, v = compute_motion(Ix, Iy, It)
+    #         img1_warp = warp(img1,u,v)
+    #         img1 = img1_warp
+    #     # upsample motion field (u, v)
+    #     if i !=pyramid_len-1:
+    #         u = u.repeat(2, axis=0).repeat(2, axis=1)
+    #         v = v.repeat(2, axis=0).repeat(2, axis=1)
+
+    for i in range(n_iter):
+        for k in range(pyramid_len):
+            img1 = pyramid1[k]
+            img2 = pyramid2[k]
+            if i !=0 or k !=0:
+                img1 = warp(img1, u, v)
+            Ix, Iy, It = compute_derivatives(img1,img2)
+            u, v = compute_motion(Ix, Iy, It)
+            if k !=pyramid_len-1:
+                u = u.repeat(2, axis=0).repeat(2, axis=1)
+                v = v.repeat(2, axis=0).repeat(2, axis=1)
+
+            if k == pyramid_len-1 and i !=n_iter-1:
+                u = downsample_x2(downsample_x2(u))
+                v = downsample_x2(downsample_x2(v))
+
     assert u.shape == im1.shape and \
             v.shape == im1.shape
     return u, v
@@ -385,11 +400,11 @@ def task9_answer():
     Which statements about optical flow estimation are true?
     Provide the corresponding indices in a tuple.
 
-    1. For rectified image pairs, we can estimate optical flow 
+    1. For rectified image pairs, we can estimate optical flow
        using disparity computation methods.
     2. Lucas-Kanade method allows to solve for large motions in a principled way
        (i.e. without compromise) by simply using a larger patch size.
-    3. Coarse-to-fine Lucas-Kanade is robust (i.e. negligible difference in the 
+    3. Coarse-to-fine Lucas-Kanade is robust (i.e. negligible difference in the
        cost function) to the patch size, in contrast to the single-scale approach.
     4. Lucas-Kanade method implicitly incorporates smoothness constraints, i.e.
        that the flow vector of neighbouring pixels should be similar.
