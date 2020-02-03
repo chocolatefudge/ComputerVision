@@ -355,22 +355,6 @@ def coarse_to_fine(im1, im2, pyramid1, pyramid2, n_iter=3):
     v = np.zeros_like(im1)
     pyramid_len = len(pyramid1)
 
-    # for i in range(pyramid_len):
-    #     print(i)
-    #     img1 = pyramid1[i]
-    #     img2 = pyramid2[i]
-    #     if i!=0:
-    #         img1 = warp(img1, u, v)
-    #     for k in range(n_iter):
-    #         Ix, Iy, It = compute_derivatives(img1,img2)
-    #         u, v = compute_motion(Ix, Iy, It)
-    #         img1_warp = warp(img1,u,v)
-    #         img1 = img1_warp
-    #     # upsample motion field (u, v)
-    #     if i !=pyramid_len-1:
-    #         u = u.repeat(2, axis=0).repeat(2, axis=1)
-    #         v = v.repeat(2, axis=0).repeat(2, axis=1)
-
     for i in range(n_iter):
         for k in range(pyramid_len):
             img1 = pyramid1[k]
@@ -412,4 +396,4 @@ def task9_answer():
 
     """
 
-    return (-1, -2, -3)
+    return (3, 4, 5)
